@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..')))
 
-from pyros.mockinterface import MockInterface, mock_service
+from pyros.mockinterface import MockInterface
 from pyros.mockinterface.mockservice import statusecho_service, MockService
 
 import nose
@@ -19,18 +19,18 @@ def test_mockinterface_update_services_c1():
     mockif = MockInterface()
 
     assert_true(mockif.services.get(svc_name) is None)  # service not exposed yet
-    diffupdate = mockif.update_services(add_names=[svc_name], remove_names=[])
+    diffupdate = mockif.update_services()
     assert_false(diffupdate.added)  # service not detected cannot be added
     assert_false(diffupdate.removed)
 
-    diffupdate = mockif.update_services(add_names=[], remove_names=[svc_name])
+    diffupdate = mockif.update_services()
     assert_false(diffupdate.added)
     assert_false(diffupdate.removed)  # service not added cannot be removed
 
-    with mock_service(svc_name, statusecho_service):  # simulating service appearing
+    with mockif.mock_service(svc_name, statusecho_service):  # simulating service appearing
         mockif.services_args.add(svc_name)  # adding it to regex list to allow it to be exposed
 
-        diffupdate = mockif.update_services(add_names=[svc_name], remove_names=[])
+        diffupdate = mockif.update_services()
         assert_false(diffupdate.removed)
         assert_true(diffupdate.added)  # service exposed can be added
 
@@ -38,7 +38,7 @@ def test_mockinterface_update_services_c1():
         assert_true(svc is not None)  # service exposed now
         assert_true(isinstance(svc, MockService))  # service type is MockService
 
-        diffupdate = mockif.update_services(add_names=[], remove_names=[svc_name])
+        diffupdate = mockif.update_services()
         assert_false(diffupdate.added)
         assert_true(diffupdate.removed)  # service exposed can be deleted
 
@@ -52,18 +52,18 @@ def test_mockinterface_update_services_c2():
     mockif = MockInterface()
 
     assert_true(mockif.services.get(svc_name) is None)  # service not exposed yet
-    diffupdate = mockif.update_services(add_names=[svc_name], remove_names=[])
+    diffupdate = mockif.update_services()
     assert_false(diffupdate.added)  # service not detected cannot be added
     assert_false(diffupdate.removed)
 
-    diffupdate = mockif.update_services(add_names=[], remove_names=[svc_name])
+    diffupdate = mockif.update_services()
     assert_false(diffupdate.added)
     assert_false(diffupdate.removed)  # service not added cannot be removed
 
-    with mock_service(svc_name, statusecho_service):  # simulating service appearing
+    with mockif.mock_service(svc_name, statusecho_service):  # simulating service appearing
         mockif.services_args.add(svc_name)  # adding it to regex list to allow it to be exposed
 
-        diffupdate = mockif.update_services(add_names=[svc_name], remove_names=[])
+        diffupdate = mockif.update_services()
         assert_false(diffupdate.removed)
         assert_true(diffupdate.added)  # service exposed can be added
 
@@ -77,7 +77,7 @@ def test_mockinterface_update_services_c2():
     # These should be handled by the service class.
     # TODO : assert this
 
-    diffupdate = mockif.update_services(add_names=[], remove_names=[svc_name])
+    diffupdate = mockif.update_services()
     assert_false(diffupdate.added)
     assert_true(diffupdate.removed)  # service non available (but added) can be deleted
 
@@ -95,7 +95,7 @@ def test_mockinterface_expose_update_services_fullname():
     assert_false(diffupdate.added)  # service not detected cannot be added
     assert_false(diffupdate.removed)
 
-    with mock_service(svc_name, statusecho_service):
+    with mockif.mock_service(svc_name, statusecho_service):
 
         diffupdate = mockif.expose_services([svc_name])
         assert_false(diffupdate.removed)
@@ -136,7 +136,7 @@ def test_mockinterface_update_expose_services_fullname():
     assert_false(diffupdate.added)  # service not available is not detected and not added
     assert_false(diffupdate.removed)  # service not added previously is not removed
 
-    with mock_service(svc_name, statusecho_service):
+    with mockif.mock_service(svc_name, statusecho_service):
 
         diffupdate = mockif.services_change_detect()
         assert_false(diffupdate.removed)
@@ -204,7 +204,7 @@ def test_mockinterface_expose_services_regex():
     assert_false(diffupdate.added)  # service not detected cannot be added
     assert_false(diffupdate.removed)
 
-    with mock_service(svc_name, statusecho_service):
+    with mockif.mock_service(svc_name, statusecho_service):
 
         diffupdate = mockif.services_change_detect()
         assert_false(diffupdate.removed)
@@ -231,7 +231,7 @@ def test_mockinterface_update_expose_services_fullname_diff():
     assert_false(diffupdate.added)  # service not passed in diff is not detected and not added
     assert_false(diffupdate.removed)  # service not added previously is not removed
 
-    with mock_service(svc_name, statusecho_service):
+    with mockif.mock_service(svc_name, statusecho_service):
 
         diffupdate = mockif.services_change_diff([svc_name], [])
         assert_false(diffupdate.removed)
@@ -299,7 +299,7 @@ def test_mockinterface_expose_services_regex_diff():
     assert_false(diffupdate.added)  # service not detected cannot be added
     assert_false(diffupdate.removed)
 
-    with mock_service(svc_name, statusecho_service):
+    with mockif.mock_service(svc_name, statusecho_service):
 
         diffupdate = mockif.services_change_diff([svc_name], [])
         assert_false(diffupdate.removed)
