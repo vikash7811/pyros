@@ -86,9 +86,10 @@ class BaseInterface(object):
         """
         # Current services topics and actions interfaces, i.e. those which are
         # active in the system.
-        self.services_if = transient_interface.TransientInterface("service", self.get_svc_list, self.ServiceMaker, self.ServiceCleaner)
-        self.topics_if = transient_interface.TransientInterface("topic", self.get_topic_list, self.TopicMaker, self.TopicCleaner)
-        self.params_if = transient_interface.TransientInterface("param", self.get_param_list, self.ParamMaker, self.ParamCleaner)
+        # TODO : collapse this into one (need just one more component)
+        self.services_if = transient_interface.TransientInterface("service", self.get_svc_list, self.service_type_resolver, self.ServiceMaker, self.ServiceCleaner)
+        self.topics_if = transient_interface.TransientInterface("topic", self.get_topic_list, self.topic_type_resolver, self.TopicMaker, self.TopicCleaner)
+        self.params_if = transient_interface.TransientInterface("param", self.get_param_list, self.param_type_resolver, self.ParamMaker, self.ParamCleaner)
 
         # TMP assigning the only instance variables to class variables
         BaseInterface.services_if_lock = self.services_if.transients_if_lock  # writer lock (because we have subscribers on another thread)

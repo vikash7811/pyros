@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from __future__ import print_function
 
 import logging
 from contextlib import contextmanager
@@ -9,7 +10,16 @@ import threading
 import collections
 import re
 
-from .excess import EntityManager, System, SystemManager
+
+# In case we launch this as a module, we want to be able to resolve relative import and run doctests
+if __package__ is None:
+    import sys
+    from os import path
+    sys.path.append(path.dirname(path.abspath(__file__)))
+    from excess import EntityManager, System, SystemManager
+else:
+    from .excess import EntityManager, System, SystemManager
+
 
 # module wide to be pickleable
 DiffTuple = collections.namedtuple("DiffTuple", " added removed ")
@@ -105,6 +115,36 @@ Changed = enum(UNKNOWN=0, APPEARED=1, GONE=2)
 
 # Defining Systems
 
+class TypeResolver(System):
+
+    def __init__(self):
+        super(TypeResolver, self).__init__()
+
+    def configure(self, entity_mgr, type_resolver):
+        # TODO : make sure this is referenced and can be dynamically updated
+        self.type_resolver = type_resolver
+
+    def loop(self, entity_mgr, time_delta):
+
+        # only for testing/reporting purpose on what was changed
+        added = []
+        removed = []
+
+        entities_toresolve = entity_mgr.filter_by_component(["name"], filter=lambda e: "type" not in e)
+
+        for e in entities_toresolve:
+            try:
+                e["type"] = self.type_resolver(e.get("name"))
+            except Exception as exc:
+                logging.warn("[{name}] Cannot resolve type of {desc} {transient} : {exc}".format(
+                    name=__name__, desc=e.get("desc"), transient=e.get("name"), exc=exc)
+                )
+                exc_info = sys.exc_info()
+                six.reraise(exc_info[0], exc_info[1], exc_info[2])
+
+System.register(TypeResolver)
+
+
 class InterfaceUpdater(System):
 
     def __init__(self):
@@ -116,26 +156,19 @@ class InterfaceUpdater(System):
         added = []
         removed = []
 
-        entities_toadd = entity_mgr.filter_by_component(["name", "type_resolver", "desc", "tif_maker"])
+        entities_toadd = entity_mgr.filter_by_component(["name", "type", "desc", "tif_maker"])
 
         for e in entities_toadd:
             try:
-                e.type = e.type_resolver(e.name)
-                if e.type is not None:  # transient can be resolved
-                    e.tif = e.tif_maker(e.name, e.type, e.class_build_args, e.class_build_kwargs)
-                    added += [e.name]
-                    logging.info(
-                        "[{name}] Interfacing with {desc} {transient}".format(
-                            name=__name__, desc=e.desc, transient=e.name)
-                    )
-                else:
-                    logging.warning(
-                        "[{name}] Type of {desc} {transient} unknown. Giving up trying to interface.".format(
-                            name=__name__, desc=e.desc, transient=e.name)
-                    )
+                e["tif"] = e.get("tif_maker")(e.get("name"), e.get("type"), e.get("class_build_args"), e.get("class_build_kwargs"))
+                added += [e.get("name")]
+                logging.info(
+                    "[{name}] Interfacing with {desc} {transient}".format(
+                        name=__name__, desc=e.get("desc"), transient=e.get("name"))
+                )
             except Exception as exc:
                 logging.warn("[{name}] Cannot interface with {desc} {transient} : {exc}".format(
-                    name=__name__, desc=e.desc, transient=e.name, exc=exc)
+                    name=__name__, desc=e.get("desc"), transient=e.get("name"), exc=exc)
                 )
                 exc_info = sys.exc_info()
                 six.reraise(exc_info[0], exc_info[1], exc_info[2])
@@ -146,7 +179,7 @@ class InterfaceUpdater(System):
         for e in entities_todel:
             # because we might have modified resolved_dict after building the list to loop on
             logging.info("[{name}] Removing {desc} {transient}".format(name=__name__, desc=e.desc,
-                                                                       transient=e.name))
+                                                                       transient=e.get("name")))
             e.tif_cleaner(e.name)  # calling the cleanup function in case we need to do something
             e.destroy()
             removed += [e.name]
@@ -161,47 +194,74 @@ class ChangeFilter(System):
     """
 
     def __init__(self):
+        """
+        Initializes this System
+        """
         super(ChangeFilter, self).__init__()
 
     def configure(self, entity_mgr, regex_args, tif_maker, tif_cleaner):
+        """
+        Configure this System
+        :param entity_mgr: the entity manager we work with
+        :param regex_args: the regex arguments
+        :param tif_maker: the transient interface builder function
+        :param tif_cleaner: the transient interface cleaner function
+        :return: None
+        """
         # TODO : make sure this is referenced and can be dynamically updated
         self.regex_args = regex_args
         self.tif_maker = tif_maker
         self.tif_cleaner = tif_cleaner
 
     def loop(self, entity_mgr, time_delta):
+        """
+        Add constructor/destructor functions to be called for each added/gone entity
+        :param entity_mgr: the entity manager we work with
+        :param time_delta: the time_delta since the last update
+        :return: None
+        >>> entities= EntityManager()
+        >>> entities.create(name="test_added_entity", changed=Changed.ADDED, desc="filterable_entity")
+        >>> entities.create(name="test_gone_entity", changed=Changed.GONE, desc="filterable_entity")
+        >>> s = ChangeFilter()
+        >>> s.configure(regex_args=["test_.*"], tif_maker=(lambda n, t: print("maker({0},{1}".format(n,t))), tif_cleaner=(lambda n, t: print("cleaner({0},{1}".format(n,t))))
+        >>> s.loop(1)
+        >>> entities.filter_by_component(["changed"], lambda e: e.get("changed") == ADDED)
+        []
+        >>> entities.filter_by_component(["changed"], lambda e: e.get("changed") == GONE)
+        []
+        """
         transients_changed = entity_mgr.filter_by_component(["name", "changed", "desc"])
 
-        transients_appeared = [t for t in transients_changed if transients_changed.added]
-        to_add = {m for m in regexes_match_sublist(self.regex_args, transients_appeared)}
+        transients_appeared = [t for t in transients_changed if t.get("changed") == Changed.ADDED]
+        to_add = [m for m in regexes_match_sublist(self.regex_args, transients_appeared)]
 
         for t in to_add:
-            t.tif_maker = self.tif_maker
+            self.filtered_toadd(t)
 
-        transients_gone = [t for t in transients_changed if transients_changed.lost]
-        lost_matches = {n for n in entity_mgr.filter_by_component("name") if find_first_regex_match(n.get("name"), self.regex_args) is None}
-        to_remove = set(transients_gone) | lost_matches  # we stop interfacing with lost transient OR lost matches
+        transients_gone = [t for t in transients_changed if t.get("changed") == Changed.GONE]
+        lost_matches = [n for n in entity_mgr.filter_by_component("name") if find_first_regex_match(n.get("name"), self.regex_args) is None]
+        to_remove = transients_gone + lost_matches  # we stop interfacing with lost transient OR lost matches
 
         for t in to_remove:
-            t.tif_cleaner = self.tif_cleaner
+            self.filtered_toremove(t)
 
-        return to_add, to_remove
 
-    # This is useful for testing directly the system effect
+    # These are useful to test this system effects on the entities
+    def filtered_toadd(self, t):
+        t["tif_maker"] = self.tif_maker
+
+    def filtered_toremove(self, t):
+        t["tif_cleaner"] = self.tif_cleaner
+
     @contextmanager
-    def test_me(self, svc_name, changes, svc_type):
-        print(" -> Mock Service {svc_name} appear".format(**locals()))
-        self.services_available_lock.acquire()
+    def filter(self, entity_mgr, e):  # TODO used passed type
+        print(" -> Simulate {self.transient_desc} {svc_name} toadd".format(**locals()))
         # Service appears
-        self.services_available[svc_name] = svc_type
-        self.services_available_lock.release()
-        yield
-        self.services_available_lock.acquire()
+        self.filtered_toadd(entity_mgr, e)
+        yield e
         # Service disappear
-        self.services_available.pop(svc_name)
-        self.services_available_lock.release()
-        print(" -> Mock Service {svc_name} disappear".format(**locals()))
-
+        self.filtered_toremove(e)
+        print(" -> Mock {self.transient_desc} {svc_name} disappear".format(**locals()))
 
 System.register(ChangeFilter)
 
@@ -237,12 +297,25 @@ class ChangeDetector(System):
         # maybe via two different systems ?
 
     # These are useful to test this system effects on the entities
+    # TODO : if available we already want the type here.
+    # If not the resolver will deal with it later...
     def detected_appeared(self, entity_mgr, tst_name):
         return entity_mgr.create(name=tst_name, changed=Changed.APPEARED, desc=self.transient_desc)
 
     def detected_gone(self, entity_mgr, tst):
-        tst.changed = Changed.GONE
-        return tst.name
+        tst["changed"] = Changed.GONE
+        #TODO : find a solution for cleaning up...
+        return tst.get("name")
+
+    @contextmanager
+    def detection(self, entity_mgr, svc_name, svc_type = None):  # TODO used passed type
+        print(" -> Simulate {self.transient_desc} {svc_name} appear".format(**locals()))
+        # Service appears
+        e = self.detected_appeared(entity_mgr, svc_name)
+        yield e
+        # Service disappear
+        self.detected_gone(e)
+        print(" -> Mock {self.transient_desc} {svc_name} disappear".format(**locals()))
 
 
 System.register(ChangeDetector)
@@ -260,17 +333,9 @@ class TransientInterface(object):
     """
 
     def get_transient_list(self):  # function returning all transients available on the system
-        return [s.name for s in self.transients_if.filter_by_component("name")]
+        return [t.get("name") for t in self.transients_if.filter_by_component("name")]
 
-    def transient_type_resolver(self, transient_name):  # function resolving the type of a transient
-        """
-        :param transient_name: the name of the transient
-        :return: returns None if the type cannot be found. Properly except in all other unexpected events.
-        """
-        svc = filter(lambda x: x.name == transient_name, self.transients_if.filter_by_component("name"))
-        return getattr(svc, 'type') if svc else None  # return the type if present else except, but return None if service missing.
-
-    def __init__(self, transient_desc=None, get_transient_list=None, tif_maker=None, tif_cleaner=None):
+    def __init__(self, transient_desc=None, get_transient_list=None, transient_type_resolver=None, tif_maker=None, tif_cleaner=None):
         """
         Initializes the interface instance, to expose transients
         :param transient_desc: transients descriptive string, ie "service" or "publisher"
@@ -294,16 +359,22 @@ class TransientInterface(object):
         #: How we can describe our transients
         self.transient_desc = transient_desc or "transient"
 
+        #: can resolve the type of a transient if needed
+        self.transient_type_resolver = transient_type_resolver
+
         #: To be able to create and destroy transients
         self.tif_maker = tif_maker or (lambda name, type, args, kwargs: (name, type, args, kwargs))
         self.tif_cleaner = tif_cleaner or (lambda name: () )
 
         # Adding Systems one by one
+
+        self.resolver = TypeResolver()
         self.updater = InterfaceUpdater()
         self.change_detector = ChangeDetector()
         self.change_filter = ChangeFilter()
 
         # configuring all systems, ready to go
+        self.resolver.configure(self.transients_if, self.transient_type_resolver)
         self.updater.configure(self.transients_if)
         self.change_detector.configure(self.transients_if, get_transient_list, transient_desc)
         self.change_filter.configure(self.transients_if, self.transients_args, tif_maker, tif_cleaner)
@@ -317,6 +388,8 @@ class TransientInterface(object):
         :return: a DiffTuple containing the list of transient interfaces (tif) added and removed
         """
         # Important : no effect if names is empty list, only return empty DiffTuple (null element, functional style).
+
+        regexes = regexes or []  # forcing empty list (tofollow normal process) if passed None
 
         add_names = []
         rem_names = []
@@ -344,21 +417,21 @@ class TransientInterface(object):
 ## BW COMPAT BGIN
 
     def update_transients(self):
-        before = {e.name for e in self.transients_if.filter_by_component("name")}
+        before = {e.get("name") for e in self.transients_if.filter_by_component("name")}
         self.updater.loop(self.transients_if, 0)
-        after = {e.name for e in self.transients_if.filter_by_component("name")}
+        after = {e.get("name") for e in self.transients_if.filter_by_component("name")}
         return DiffTuple(added=after - before, removed=before - after)
 
     def transients_change_detect(self):
-        before = {e.name for e in self.transients_if.filter_by_component("name")}
+        before = {e.get("name") for e in self.transients_if.filter_by_component("name")}
         self.change_detector.loop(self.transients_if, 0)
-        after = {e.name for e in self.transients_if.filter_by_component("name")}
+        after = {e.get("name") for e in self.transients_if.filter_by_component("name")}
         return DiffTuple(added=after - before, removed=before - after)
 
     def transients_change_diff(self):
-        before = {e.name for e in self.transients_if.filter_by_component("name")}
+        before = {e.get("name") for e in self.transients_if.filter_by_component("name")}
         self.change_filter.loop(self.transients_if, 0)
-        after = {e.name for e in self.transients_if.filter_by_component("name")}
+        after = {e.get("name") for e in self.transients_if.filter_by_component("name")}
         return DiffTuple(added=after - before, removed=before - after)
 
 ## BW COMPAT END
@@ -382,31 +455,19 @@ class TransientInterface(object):
         """
 
         # Preparing to compute difference to report later
-        before_expose = {e.name for e in self.transients_if.filter_by_component("name")}
+        before_expose = {e.get("name") for e in self.transients_if.filter_by_component("name")}
 
         # TODO time delta here
         self.change_detector.loop(self.transients_if, 0)
         self.change_filter.loop(self.transients_if, 0)
+        self.resolver.loop(self.transients_if, 0)
         self.updater.loop(self.transients_if, 0)
 
-
-        after_expose = {e.name for e in self.transients_if.filter_by_component("name")}
+        after_expose = {e.get("name") for e in self.transients_if.filter_by_component("name")}
 
         return DiffTuple(added=after_expose - before_expose, removed=before_expose - after_expose)
 
-    @contextmanager
-    def simulate_transient(self, svc_name, svc_type):
-        print(" -> Simulate {self.transient_desc} {svc_name} appear".format(**locals()))
-        self.transients_if_lock.acquire()
-        # Service appears
-        e = self.transients_if.create(name=t, changed=Changed.APPEARED, desc=self.transient_desc)
-        self.transients_if_lock.release()
-        yield e
-        self.transients_if_lock.acquire()
-        # Service disappear
-        self.transients_if.destroy(e)
-        self.transients_if_lock.release()
-        print(" -> Mock {self.transient_desc} {svc_name} disappear".format(**locals()))
+
 
 
     # TODO : "wait_for_it" methods that waits for hte detection of a topic/service on the system

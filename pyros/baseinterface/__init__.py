@@ -11,6 +11,7 @@
 from __future__ import absolute_import
 
 from .baseinterface import BaseInterface, DiffTuple
+from .transient_interface import TransientInterface
 from .baseservice import BaseService
 from .basetopic import BaseTopic
 

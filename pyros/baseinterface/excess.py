@@ -6,6 +6,8 @@ import collections
 
 import time
 
+import six
+
 """
 Moving slowly towards entity component system design:
 
@@ -42,15 +44,22 @@ class EntityManager(list):
     It is simply a list that provide extra functionality
     """
 
-    def filter_by_component(self, component_list):
+    def filter_by_component(self, component_list, filter=None):
         """
         Return a "view" of the entities currently managed here.
         :param component_list: list of component to filter by
+        :param filter : a predicate to help filtering entities
         :return:
         """
+        if type(component_list) is not list:
+        #if isinstance(component_list, six.string_types):
+            component_list = [component_list]
+
+        filter = filter or (lambda e: True)  # by default just return  True if component is present
+
         entities_subset = []
         for c in component_list:
-            entities_subset += [e for e in self if hasattr(e, c)]
+            entities_subset += [e for e in self if c in e and filter(e)]
         return entities_subset
 
     def create(self, iterable=None, **kwargs):
@@ -60,7 +69,10 @@ class EntityManager(list):
         :param kwargs:
         :return:
         """
-        new_entity = dict(iterable=iterable, **kwargs)
+        if iterable:
+            new_entity = dict(iterable)
+        elif kwargs:
+            new_entity = dict(**kwargs)
         self.append(new_entity)
         return new_entity
 
