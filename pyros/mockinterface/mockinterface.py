@@ -49,11 +49,6 @@ class MockInterface():
         BaseInterface.topics_if_lock = self.topics_if.transients_if_lock
         BaseInterface.params_if_lock = self.params_if.transients_if_lock
 
-        # dict style access for bwcompat
-        self.services = {e.name: e for e in self.services_if.transients_if.filter_by_component("name")}
-        self.topics = {e.name: e for e in self.topics_if.transients_if.filter_by_component("name")}
-        self.params = {e.name: e for e in self.params_if.transients_if.filter_by_component("name")}
-
         # Last requested services topics and actions to be exposed, received
         # from a reconfigure request. Topics which match topics containing
         # wildcards go in here after they are added, but when a new reconfigure
@@ -70,6 +65,7 @@ class MockInterface():
         self.expose_services = self.services_if.expose_transients_regex
         self.services_change_detect = self.services_if.transients_change_detect
         self.services_change_diff = self.services_if.transients_change_diff
+        self.resolve_services = self.services_if.resolve_transients
 
         # self.update_topics = self.topics_if.update_transients
         self.expose_topics = self.topics_if.expose_transients_regex

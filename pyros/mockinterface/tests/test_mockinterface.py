@@ -20,7 +20,7 @@ def test_mockinterface_update_services_c1():
     svc_name = '/awesome_service'
     mockif = MockInterface()
 
-    assert_true(mockif.services.get(svc_name) is None)  # service not exposed yet
+    assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
     diffupdate = mockif.update_services()
     assert_false(diffupdate.added)  # service not detected cannot be added
     assert_false(diffupdate.removed)
@@ -32,26 +32,37 @@ def test_mockinterface_update_services_c1():
     with mock_service_remote(svc_name, statusecho_service):  # service appearing on mock system (another python process)
         mockif.services_args.add(svc_name)  # adding it to regex list to allow it to be exposed
 
+        # TODO : change this to use context managers...
         # detect what changed
-        mockif.services_change_detect()
+        detected = mockif.services_change_detect()
+        assert_true(len(detected.added) == 1 and svc_name in detected.added)
+        assert_true(len(detected.removed) == 0)
 
         # compute diff of what we need to update
-        mockif.services_change_diff()
+        diff = mockif.services_change_diff()
+        assert_true(len(diff.added) == 1 and svc_name in diff.added)
+        assert_true(len(diff.removed) == 0)
+
+        mockif.resolve_services()
 
         # do the update
         diffupdate = mockif.update_services()
         assert_false(diffupdate.removed)
         assert_true(diffupdate.added)  # service exposed can be added
 
-        svc = mockif.services.get(svc_name)
-        assert_true(svc is not None)  # service exposed now
-        assert_true(isinstance(svc, MockService))  # service type is MockService
+        indexed_services = mockif.services_if.transients_if.index_by_component("name")
+        assert_true(svc_name in indexed_services)
+        assert_true(isinstance(indexed_services[svc_name].get("tif"), MockService))  # service type is MockService
 
     # detect what changed
-    mockif.services_change_detect()
+    detected = mockif.services_change_detect()
+    assert_true(len(detected.removed) == 1 and svc_name in detected.removed)
+    assert_true(len(detected.added) == 0)
 
     # compute diff of what we need to update
-    mockif.services_change_diff()
+    diff = mockif.services_change_diff()
+    assert_true(len(diff.removed) == 1 and svc_name in diff.removed)
+    assert_true(len(diff.added) == 0)
 
     diffupdate = mockif.update_services()
     assert_false(diffupdate.added)
@@ -66,7 +77,7 @@ def test_mockinterface_update_services_c2():
     svc_name = '/awesome_service'
     mockif = MockInterface()
 
-    assert_true(mockif.services.get(svc_name) is None)  # service not exposed yet
+    assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
     diffupdate = mockif.update_services()
     assert_false(diffupdate.added)  # service not detected cannot be added
     assert_false(diffupdate.removed)
@@ -75,7 +86,7 @@ def test_mockinterface_update_services_c2():
     assert_false(diffupdate.added)
     assert_false(diffupdate.removed)  # service not added cannot be removed
 
-    with mockif.services_if.change_detector.detection(mockif.services_if.transients_if, svc_name, statusecho_service):  # simulating service appearing
+    with mockif.services_if.mock_detection(mockif.services_if.transients_if, svc_name, statusecho_service):  # simulating service appearing
         mockif.services_args.add(svc_name)  # adding it to regex list to allow it to be exposed
 
         diffupdate = mockif.update_services()
@@ -105,12 +116,12 @@ def test_mockinterface_expose_update_services_fullname():
     svc_name = '/awesome_service'
     mockif = MockInterface()
 
-    assert_true(mockif.services.get(svc_name) is None)  # service not exposed yet
+    assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
     diffupdate = mockif.expose_services([svc_name])
     assert_false(diffupdate.added)  # service not detected cannot be added
     assert_false(diffupdate.removed)
 
-    with mockif.services_if.change_detector.detection(mockif.services_if.transients_if, svc_name, statusecho_service):
+    with mockif.services_if.mock_detection(mockif.services_if.transients_if, svc_name, statusecho_service):
 
         diffupdate = mockif.expose_services([svc_name])
         assert_false(diffupdate.removed)
@@ -151,14 +162,13 @@ def test_mockinterface_update_expose_services_fullname():
     assert_false(diffupdate.added)  # service not available is not detected and not added
     assert_false(diffupdate.removed)  # service not added previously is not removed
 
-    with mockif.services_if.change_detector.detection(mockif.services_if.transients_if, svc_name) as s:
+    with mockif.services_if.mock_detection(mockif.services_if.transients_if, svc_name) as s:
 
         diffupdate = mockif.services_change_detect()
         assert_false(diffupdate.removed)
         assert_false(diffupdate.added)  # service available is not detected and added without previous expose call
 
-        svc = mockif.services.get(svc_name)
-        assert_true(svc is None)  # service not exposed now
+        assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
 
         diffupdate = mockif.expose_services([svc_name])
         assert_false(diffupdate.removed)
@@ -214,12 +224,12 @@ def test_mockinterface_expose_services_regex():
     svc_regex = '/.*'
     mockif = MockInterface()
 
-    assert_true(mockif.services.get(svc_name) is None)  # service not exposed yet
+    assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
     diffupdate = mockif.expose_services([svc_regex])
     assert_false(diffupdate.added)  # service not detected cannot be added
     assert_false(diffupdate.removed)
 
-    with mockif.services_if.change_detector.detection(mockif.services_if.transients_if, svc_name, statusecho_service):
+    with mockif.services_if.mock_detection(mockif.services_if.transients_if, svc_name, statusecho_service):
 
         diffupdate = mockif.services_change_detect()
         assert_false(diffupdate.removed)
@@ -246,14 +256,13 @@ def test_mockinterface_update_expose_services_fullname_diff():
     assert_false(diffupdate.added)  # service not passed in diff is not detected and not added
     assert_false(diffupdate.removed)  # service not added previously is not removed
 
-    with mockif.services_if.change_detector.detection(mockif.services_if.transients_if, svc_name, statusecho_service):
+    with mockif.services_if.mock_detection(mockif.services_if.transients_if, svc_name, statusecho_service):
 
         diffupdate = mockif.services_change_diff()
         assert_false(diffupdate.removed)
         assert_false(diffupdate.added)  # service available is not detected and added without previous expose call
 
-        svc = mockif.services.get(svc_name)
-        assert_true(svc is None)  # service not exposed now
+        assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
 
         diffupdate = mockif.expose_services([svc_name])
         assert_false(diffupdate.removed)
@@ -309,20 +318,20 @@ def test_mockinterface_expose_services_regex_diff():
     svc_regex = '/.*'
     mockif = MockInterface()
 
-    assert_true(mockif.services.get(svc_name) is None)  # service not exposed yet
+    assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
     diffupdate = mockif.expose_services([svc_regex])
     assert_false(diffupdate.added)  # service not detected cannot be added
     assert_false(diffupdate.removed)
 
-    with mockif.services_if.change_detector.detection(mockif.services_if.transients_if, svc_name, statusecho_service):
+    with mockif.services_if.mock_detection(mockif.services_if.transients_if, svc_name, statusecho_service):
 
         diffupdate = mockif.services_change_diff()
         assert_false(diffupdate.removed)
         assert_true(diffupdate.added)  # new diff call finds the service and adds it
 
-        svc = mockif.services.get(svc_name)
-        assert_true(svc is not None)  # service exposed
-        assert_true(isinstance(svc, MockService))  # service type is MockService
+        indexed_services = mockif.services_if.transients_if.index_by_component("name")
+        assert_true(svc_name in indexed_services)
+        assert_true(isinstance(indexed_services[svc_name].get("tif"), MockService))  # service type is MockService
 
     diffupdate = mockif.services_change_diff()
     assert_false(diffupdate.added)

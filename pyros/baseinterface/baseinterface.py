@@ -117,6 +117,7 @@ class BaseInterface(object):
         self.expose_services = self.services_if.expose_transients_regex
         self.services_change_detect = self.services_if.transients_change_detect
         self.services_change_diff = self.services_if.transients_change_diff
+        self.resolve_services = self.services_if.resolve_transients
 
         #self.update_topics = self.topics_if.update_transients
         self.expose_topics = self.topics_if.expose_transients_regex

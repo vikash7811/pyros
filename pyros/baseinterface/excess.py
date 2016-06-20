@@ -44,23 +44,47 @@ class EntityManager(list):
     It is simply a list that provide extra functionality
     """
 
+    def index_by_component(self, component, filter=None):
+        """
+        Return the list of entities, as a dict, indexed by the component passed as parameter
+        :param component:
+        :param filter:
+        :return:
+        """
+
+        filter = filter or (lambda e: True)  # by default just return  True if component is present
+
+        return {e.get(component): e for e in self if component in set(e) and filter(e)}
+
+
     def filter_by_component(self, component_list, filter=None):
         """
         Return a "view" of the entities currently managed here.
         :param component_list: list of component to filter by
         :param filter : a predicate to help filtering entities
         :return:
+        >>> entities = EntityManager()
+        >>> entities.create(c1='ceeone', c2='ceetwo', c3='c3')
+        {'c3': 'c3', 'c2': 'ceetwo', 'c1': 'ceeone'}
+        >>> entities.create(c1='c1', c5='cfive', c2='c2')
+        {'c2': 'c2', 'c1': 'c1', 'c5': 'cfive'}
+        >>> entities.filter_by_component(['c1', 'c2'])
+        [{'c3': 'c3', 'c2': 'ceetwo', 'c1': 'ceeone'}, {'c2': 'c2', 'c1': 'c1', 'c5': 'cfive'}]
+        >>> entities.filter_by_component('c5')
+        [{'c2': 'c2', 'c1': 'c1', 'c5': 'cfive'}]
+        >>> entities.filter_by_component(['c5', 'c7'])
+        []
         """
-        if type(component_list) is not list:
-        #if isinstance(component_list, six.string_types):
-            component_list = [component_list]
+
+        if type(component_list) is not set:
+            if type(component_list) is list:
+                component_list = set(component_list)
+            else:  # usually string type
+                component_list = {component_list}
 
         filter = filter or (lambda e: True)  # by default just return  True if component is present
 
-        entities_subset = []
-        for c in component_list:
-            entities_subset += [e for e in self if c in e and filter(e)]
-        return entities_subset
+        return [e for e in self if set(e).intersection(component_list) == component_list and filter(e)]
 
     def create(self, iterable=None, **kwargs):
         """
@@ -68,6 +92,9 @@ class EntityManager(list):
         :param iterable:
         :param kwargs:
         :return:
+        >>> entities = EntityManager()
+        >>> entities.create(c1='ceeone', c2='ceetwo', c3='c3')
+        {'c3': 'c3', 'c2': 'ceetwo', 'c1': 'ceeone'}
         """
         if iterable:
             new_entity = dict(iterable)
