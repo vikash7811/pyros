@@ -336,7 +336,7 @@ class RemoveFilter(System):
     def filtered_toremove(self, t):
         t["tif_cleaner"] = self.tif_cleaner
         # we consume the changed indicator here to avoid confusion later on...
-        t.pop("changed")
+        t.pop("changed", None)  # optional : maybe nothing changed on that transient, but we just want to remove it.
 
 System.register(RemoveFilter)
 
@@ -365,12 +365,12 @@ class AppearedDetector(System):
         self.transient_desc = transient_desc
 
     def loop(self, entity_mgr, time_delta):
-        transients_known = entity_mgr.filter_by_component("name")
+        transients_known = [e.get("name") for e in entity_mgr.filter_by_component("name")]
 
         transient_detected = self.get_transient_list()
 
         for t in transient_detected:
-            if not t is transients_known:
+            if not t in transients_known:
                 self.detected_appeared(entity_mgr, t)
 
         # TODO : think more about the case of a transient that is detected both appeared and gone...
@@ -535,8 +535,8 @@ class TransientInterface(object):
         added = {e.get("name") for e in self.transients_if.filter_by_component(self.adder.component_spec()[1])} - before
         before = {e.get("name") for e in self.transients_if.filter_by_component(self.remover.component_spec()[1])}
         self.remover.loop(self.transients_if, 0)
-        # CAREFUL : Special case for sinks
-        removed = {ename for ename in before - set(self.transients_if.index_by_component(self.remover.component_spec()[1]))}
+        # CAREFUL : Special case for sinks : what we removed is what is now missing.
+        removed = before - {e.get("name") for e in self.transients_if.filter_by_component(self.remover.component_spec()[1])}
         return DiffTuple(added=added, removed=removed)
 
     def resolve_transients(self):

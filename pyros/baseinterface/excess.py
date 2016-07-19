@@ -74,6 +74,8 @@ class EntityManager(list):
         [{'c2': 'c2', 'c1': 'c1', 'c5': 'cfive'}]
         >>> entities.filter_by_component(['c5', 'c7'])
         []
+        >>> entities.filter_by_component([])
+        [{'c3': 'c3', 'c2': 'ceetwo', 'c1': 'ceeone'}, {'c2': 'c2', 'c1': 'c1', 'c5': 'cfive'}]
         """
 
         if type(component_list) is not set:
