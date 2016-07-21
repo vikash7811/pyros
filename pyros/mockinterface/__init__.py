@@ -22,8 +22,7 @@ from .mockparam import MockParam
 from .mockservice import MockService, statusecho_service
 from .mocktopic import MockTopic, statusecho_topic
 
-
-# TODO : We should probably use mock library for this and test against it...
+# TODO : We should use mock library for this and test against it...
 
 __all__ = [
     'MockTopic',

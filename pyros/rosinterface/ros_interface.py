@@ -14,6 +14,8 @@ import threading
 import Queue
 
 import time
+
+from ..baseinterface import TransientInterface
 from ..baseinterface import BaseInterface, DiffTuple
 
 from .service import ServiceBack, ServiceTuple
@@ -26,7 +28,7 @@ except ImportError:
     rocon_python_comms = None
 
 
-class RosInterface(BaseInterface):
+class RosInterface(object):
 
     """
     RosInterface.
@@ -73,8 +75,61 @@ class RosInterface(BaseInterface):
                             enable_cache=enable_cache)
                       )
 
-        # This base constructor assumes the system to interface with is already available ( can do a get_svc_list() )
-        super(RosInterface, self).__init__(services or [], topics or [], params or [])
+        # This assumes the system to interface with is already available ( can do a get_svc_list() )
+
+        # Initializes teh interface
+        # Current services topics and actions interfaces, i.e. those which are
+        # active in the system.
+        # TODO : collapse this into one (need just one more component)
+        self.services_if = TransientInterface("service",
+                                              self.get_svc_list,
+                                              self.service_type_resolver,
+                                              self.ServiceMaker,
+                                              self.ServiceCleaner)
+        self.topics_if = TransientInterface("topic",
+                                            self.get_topic_list,
+                                            self.topic_type_resolver,
+                                            self.TopicMaker,
+                                            self.TopicCleaner)
+        self.params_if = TransientInterface("param",
+                                            self.get_param_list,
+                                            self.param_type_resolver,
+                                            self.ParamMaker,
+                                            self.ParamCleaner)
+
+        # TMP assigning the only instance variables to class variables
+        BaseInterface.services_if_lock = self.services_if.transients_if_lock  # writer lock (because we have subscribers on another thread)
+        BaseInterface.topics_if_lock = self.topics_if.transients_if_lock
+        BaseInterface.params_if_lock = self.params_if.transients_if_lock
+
+        # Last requested services topics and actions to be exposed, received
+        # from a reconfigure request. Topics which match topics containing
+        # wildcards go in here after they are added, but when a new reconfigure
+        # request is received, they disappear. The value of the topic and action
+        # dicts is the number of instances that that that item has, i.e. how
+        # many times the add function has been called for the given key.
+        self.services_args = self.services_if.transients_args
+        self.params_args = self.params_if.transients_args
+        self.topics_args = self.topics_if.transients_args
+
+        # Building an interface dynamically based on the generic functional implementation
+        # use is mostly internal ( and child classes )
+        self.update_services = self.services_if.update_transients
+        self.expose_services = self.services_if.expose_transients_regex
+        self.services_change_detect = self.services_if.transients_change_detect
+        self.services_change_diff = self.services_if.transients_change_diff
+        self.resolve_services = self.services_if.resolve_transients
+
+        # self.update_topics = self.topics_if.update_transients
+        self.expose_topics = self.topics_if.expose_transients_regex
+        # self.topics_change_detect = self.topics_if.transients_change_detect
+        # self.topics_change_diff = self.topics_if.transients_change_diff
+
+        # self.update_params = self.params_if.update_transients
+        self.expose_params = self.params_if.expose_transients_regex
+        # self.params_change_detect = self.params_if.transients_change_detect
+        # self.params_change_diff = self.params_if.transients_change_diff
+
 
         # connecting to the master via proxy object
         self._master = rospy.get_master()

@@ -24,7 +24,8 @@ def test_mockinterface_update_services_c1():
     svc_name = '/awesome_service'
     mockif = MockInterface()
 
-    assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
+    assert_true(len(mockif.services_if.entities.keys()) == 0)  # service not seen yet
+
     diffupdate = mockif.update_services()
     assert_true(not diffupdate.added)  # service not detected cannot be added
     assert_true(not diffupdate.removed)
@@ -54,9 +55,8 @@ def test_mockinterface_update_services_c1():
         assert_true(not diffupdate.removed)
         assert_true(diffupdate.added)  # service exposed can be added
 
-        indexed_services = mockif.services_if.transients_if.index_by_component("name")
-        assert_true(svc_name in indexed_services)
-        assert_true(isinstance(indexed_services[svc_name].get("tif"), MockService))  # service type is MockService
+        assert_true(svc_name in mockif.services_if.entities.keys())
+        assert_true(isinstance(mockif.services_if.entities[svc_name].get("tif"), MockService))  # service type is MockService
 
     # detect what changed
     detected = mockif.services_change_detect()
@@ -72,7 +72,7 @@ def test_mockinterface_update_services_c1():
     assert_false(diffupdate.added)
     assert_true(diffupdate.removed)  # service exposed can be deleted
 
-    assert_true(svc_name not in mockif.services_if.transients_if.index_by_component("name"))  # service not exposed anymore
+    assert_true(svc_name not in mockif.services_if.entities.keys())  # service not exposed anymore
 
 
 # @nose.SkipTest  # to help debugging ( FIXME : how to programmatically start only one test - maybe in fixture - ? )
@@ -81,7 +81,7 @@ def test_mockinterface_update_services_c2():
     svc_name = '/awesome_service'
     mockif = MockInterface()
 
-    assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
+    assert_true(len(mockif.services_if.entities.keys()) == 0)  # service not exposed yet
     diffupdate = mockif.update_services()
     assert_true(not diffupdate.added)  # service not detected cannot be added
     assert_true(not diffupdate.removed)
@@ -111,12 +111,10 @@ def test_mockinterface_update_services_c2():
         assert_true(not diffupdate.removed)
         assert_true(diffupdate.added)  # service exposed can be added
 
-        indexed_services = mockif.services_if.transients_if.index_by_component("name")
-        assert_true(svc_name in indexed_services)
-        assert_true(isinstance(indexed_services[svc_name].get("tif"), MockService))  # service type is MockService
+        assert_true(svc_name in mockif.services_if.entities.keys())
+        assert_true(isinstance(mockif.services_if.entities[svc_name].get("tif"), MockService))  # service type is MockService
 
-    indexed_services = mockif.services_if.transients_if.index_by_component("name")
-    assert_true(svc_name in indexed_services)  # service is still exposed even though it s gone from the system we interface to
+    assert_true(svc_name in mockif.services_if.entities.keys())  # service is still exposed even though it s gone from the system we interface to
     # WARNING : Using the service in this state will trigger errors.
     # These should be handled by the service class.
     # TODO : assert this
@@ -135,7 +133,7 @@ def test_mockinterface_update_services_c2():
     assert_true(not diffupdate.added)
     assert_true(diffupdate.removed)  # service non available (but added) can be deleted
 
-    assert_true(svc_name not in mockif.services_if.transients_if.index_by_component("name"))  # service not exposed
+    assert_true(svc_name not in mockif.services_if.entities.keys())  # service not exposed
 
 
 # @nose.SkipTest  # to help debugging ( FIXME : how to programmatically start only one test - maybe in fixture - ? )
@@ -144,7 +142,7 @@ def test_mockinterface_expose_update_services_fullname():
     svc_name = '/awesome_service'
     mockif = MockInterface()
 
-    assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
+    assert_true(len(mockif.services_if.entities.keys()) == 0)  # service not exposed yet
     diffupdate = mockif.expose_services([svc_name])
     assert_false(diffupdate.added)  # service not detected cannot be added
     assert_false(diffupdate.removed)
@@ -155,13 +153,11 @@ def test_mockinterface_expose_update_services_fullname():
         assert_false(diffupdate.removed)
         assert_true(diffupdate.added)  # service available can be detected and be added
 
-        indexed_services = mockif.services_if.transients_if.index_by_component("name")
-        assert_true(svc_name in indexed_services)  # service exposed now
-        assert_true(isinstance(indexed_services[svc_name].get("tif"), MockService))  # service type is MockService
+        assert_true(svc_name in mockif.services_if.entities.keys())  # service exposed now
+        assert_true(isinstance(mockif.services_if.entities[svc_name].get("tif"), MockService))  # service type is MockService
 
-    indexed_services = mockif.services_if.transients_if.index_by_component("name")
-    assert_true(svc_name in indexed_services)  # service exposed now
-    assert_true(isinstance(indexed_services[svc_name].get("tif"), MockService))  # service type is MockService
+    assert_true(svc_name in mockif.services_if.entities)  # service exposed now
+    assert_true(isinstance(mockif.services_if.entities[svc_name].get("tif"), MockService))  # service type is MockService
 
     # WARNING : Using the service in this state will trigger errors.
     # These should be handled by the service class.
@@ -182,15 +178,13 @@ def test_mockinterface_expose_update_services_fullname():
     assert_true(not diffupdate.added)
     assert_true(diffupdate.removed)  # service non available (but added) can be deleted
 
-    indexed_services = mockif.services_if.transients_if.index_by_component("name")
-    assert_true(not svc_name in indexed_services)  # service not exposed anymore
+    assert_true(not svc_name in mockif.services_if.entities.keys())  # service not exposed anymore
 
     diffupdate = mockif.expose_services([svc_name])
     assert_false(diffupdate.removed)
     assert_false(diffupdate.added)  # new expose call doesn't change anything
 
-    indexed_services = mockif.services_if.transients_if.index_by_component("name")
-    assert_true(not svc_name in indexed_services)  # service not exposed anymore
+    assert_true(not svc_name in mockif.services_if.entities.keys())  # service not exposed anymore
 
 
 # @nose.SkipTest  # to help debugging ( FIXME : how to programmatically start only one test - maybe in fixture - ? )
@@ -205,30 +199,27 @@ def test_mockinterface_update_expose_services_fullname():
 
     with mock_service_remote(svc_name, statusecho_service):  # service appearing on mock system (another python process)
 
-        assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
+        assert_true(len(mockif.services_if.entities.keys()) == 0)  # service not exposed yet
 
         diffupdate = mockif.expose_services([svc_name])
         assert_true(not diffupdate.removed)
         assert_true(diffupdate.added)  # new expose call add the service because it is already available
 
-        indexed_services = mockif.services_if.transients_if.index_by_component("name")
-        assert_true(svc_name in indexed_services)  # service exposed now
-        assert_true(isinstance(indexed_services[svc_name].get("tif"), MockService))  # service type is MockService
+        assert_true(svc_name in mockif.services_if.entities.keys())  # service exposed now
+        assert_true(isinstance(mockif.services_if.entities[svc_name].get("tif"), MockService))  # service type is MockService
 
         diffupdate = mockif.expose_services([])
         assert_true(not diffupdate.added)
         assert_true(diffupdate.removed)  # new expose call can remove the service even if it is still available
 
-        indexed_services = mockif.services_if.transients_if.index_by_component("name")
-        assert_true(not svc_name in indexed_services)  # service not exposed anymore
+        assert_true(not svc_name in mockif.services_if.entities.keys())  # service not exposed anymore
 
         diffupdate = mockif.expose_services([svc_name])
         assert_true(not diffupdate.removed)
         assert_true(diffupdate.added)  # new expose call can readd if it is still available
 
-    indexed_services = mockif.services_if.transients_if.index_by_component("name")
-    assert_true(svc_name in indexed_services)  # service still exposed
-    assert_true(isinstance(indexed_services[svc_name].get("tif"), MockService))  # service type is still MockService
+    assert_true(svc_name in mockif.services_if.entities.keys())  # service still exposed
+    assert_true(isinstance(mockif.services_if.entities[svc_name].get("tif"), MockService))  # service type is still MockService
 
     # WARNING : Using the service in this state will trigger errors.
     # These should be handled by the service class.
@@ -238,15 +229,13 @@ def test_mockinterface_update_expose_services_fullname():
     assert_true(not diffupdate.added)
     assert_true(diffupdate.removed)  # new expose call can remove the service even if it is not available
 
-    indexed_services = mockif.services_if.transients_if.index_by_component("name")
-    assert_true(not svc_name in indexed_services)  # service not exposed anymore
+    assert_true(not svc_name in mockif.services_if.entities.keys())  # service not exposed anymore
 
     diffupdate = mockif.services_change_detect()
     assert_true(not diffupdate.added)  # no appeared service : nothing is added
     assert_true(not diffupdate.removed)  # disappeared service was already removed
 
-    indexed_services = mockif.services_if.transients_if.index_by_component("name")
-    assert_true(not svc_name in indexed_services)  # service not exposed anymore
+    assert_true(not svc_name in mockif.services_if.entities.keys())  # service not exposed anymore
 
 
 # @nose.SkipTest  # to help debugging ( FIXME : how to programmatically start only one test - maybe in fixture - ? )
@@ -256,7 +245,7 @@ def test_mockinterface_expose_services_regex():
     svc_regex = '/.*'
     mockif = MockInterface()
 
-    assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
+    assert_true(len(mockif.services_if.entities.keys()) == 0)  # service not exposed yet
     diffupdate = mockif.expose_services([svc_regex])
     assert_true(not diffupdate.added)  # service not detected cannot be added
     assert_true(not diffupdate.removed)
@@ -279,9 +268,8 @@ def test_mockinterface_expose_services_regex():
         assert_true(not diffupdate.removed)
         assert_true(diffupdate.added)  # service exposed can be added
 
-        indexed_services = mockif.services_if.transients_if.index_by_component("name")
-        assert_true(svc_name in indexed_services)  # service exposed now
-        assert_true(isinstance(indexed_services[svc_name].get("tif"), MockService))  # service type is MockService
+        assert_true(svc_name in mockif.services_if.entities.keys())  # service exposed now
+        assert_true(isinstance(mockif.services_if.entities[svc_name].get("tif"), MockService))  # service type is MockService
 
     diffupdate = mockif.services_change_detect()
     assert_true(not diffupdate.added)
@@ -297,8 +285,7 @@ def test_mockinterface_expose_services_regex():
     assert_true(not diffupdate.added)
     assert_true(diffupdate.removed)  # service non available (but added) can be deleted
 
-    indexed_services = mockif.services_if.transients_if.index_by_component("name")
-    assert_true(svc_name not in indexed_services)  # service not exposed anymore
+    assert_true(svc_name not in mockif.services_if.entities)  # service not exposed anymore
 
 
 # @nose.SkipTest  # to help debugging ( FIXME : how to programmatically start only one test - maybe in fixture - ? )
@@ -329,15 +316,14 @@ def test_mockinterface_update_expose_services_fullname_diff():
         assert_true(not diffupdate.removed)
         assert_true(not diffupdate.added)  # service available is not detected and added without previous expose call
 
-        assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
+        assert_true(len(mockif.services_if.entities.keys()) == 0)  # service not exposed yet
 
         diffupdate = mockif.expose_services([svc_name])
         assert_true(not diffupdate.removed)
         assert_true(diffupdate.added)  # new expose call add the service because it is already available
 
-        indexed_services = mockif.services_if.transients_if.index_by_component("name")
-        assert_true(svc_name in indexed_services)  # service exposed now
-        assert_true(isinstance(indexed_services[svc_name].get("tif"), MockService))  # service type is MockService
+        assert_true(svc_name in mockif.services_if.entities.keys())  # service exposed now
+        assert_true(isinstance(mockif.services_if.entities[svc_name].get("tif"), MockService))  # service type is MockService
 
         diffupdate = mockif.services_change_diff()
         assert_true(not diffupdate.removed)
@@ -357,24 +343,21 @@ def test_mockinterface_update_expose_services_fullname_diff():
 
         # empty diff call doesnt change anything
 
-        indexed_services = mockif.services_if.transients_if.index_by_component("name")
-        assert_true(svc_name in indexed_services)  # service still exposed now
-        assert_true(isinstance(indexed_services[svc_name].get("tif"), MockService))  # service type is still MockService
+        assert_true(svc_name in mockif.services_if.entities.keys())  # service still exposed now
+        assert_true(isinstance(mockif.services_if.entities[svc_name].get("tif"), MockService))  # service type is still MockService
 
         diffupdate = mockif.expose_services([])
         assert_true(not diffupdate.added)
         assert_true(diffupdate.removed)  # new expose call can remove the service even if it is still available
 
-        indexed_services = mockif.services_if.transients_if.index_by_component("name")
-        assert_true(svc_name not in indexed_services)  # service not exposed anymore
+        assert_true(svc_name not in mockif.services_if.entities)  # service not exposed anymore
 
         diffupdate = mockif.expose_services([svc_name])
         assert_true(not diffupdate.removed)
         assert_true(diffupdate.added)  # new expose call can readd if it is still available
 
-    indexed_services = mockif.services_if.transients_if.index_by_component("name")
-    assert_true(svc_name in indexed_services)  # service exposed now
-    assert_true(isinstance(indexed_services[svc_name].get("tif"), MockService))  # service type is MockService
+    assert_true(svc_name in mockif.services_if.entities.keys())  # service exposed now
+    assert_true(isinstance(mockif.services_if.entities[svc_name].get("tif"), MockService))  # service type is MockService
 
     # WARNING : Using the service in this state will trigger errors.
     # These should be handled by the service class.
@@ -384,8 +367,7 @@ def test_mockinterface_update_expose_services_fullname_diff():
     assert_true(not diffupdate.added)
     assert_true(diffupdate.removed)  # new expose call can remove the service even if it is not available
 
-    indexed_services = mockif.services_if.transients_if.index_by_component("name")
-    assert_true(svc_name not in indexed_services)  # service not exposed anymore
+    assert_true(svc_name not in mockif.services_if.entities.keys())  # service not exposed anymore
 
     diffupdate = mockif.services_change_diff()
     assert_true(not diffupdate.added)
@@ -403,8 +385,7 @@ def test_mockinterface_update_expose_services_fullname_diff():
     assert_true(not diffupdate.removed)  # no service passed in diff : nothing is added
     assert_true(not diffupdate.added)  # disappeared service was already removed
 
-    indexed_services = mockif.services_if.transients_if.index_by_component("name")
-    assert_true(svc_name not in indexed_services)  # service not exposed anymore
+    assert_true(svc_name not in mockif.services_if.entities.keys())  # service not exposed anymore
 
 
 # @nose.SkipTest  # to help debugging ( FIXME : how to programmatically start only one test - maybe in fixture - ? )
@@ -414,7 +395,7 @@ def test_mockinterface_expose_services_regex_diff():
     svc_regex = '/.*'
     mockif = MockInterface()
 
-    assert_true(len(mockif.services_if.transients_if.index_by_component("name")) == 0)  # service not exposed yet
+    assert_true(len(mockif.services_if.entities.keys()) == 0)  # service not exposed yet
     diffupdate = mockif.expose_services([svc_regex])
     assert_true(not diffupdate.added)  # service not detected cannot be added
     assert_true(not diffupdate.removed)
@@ -439,9 +420,8 @@ def test_mockinterface_expose_services_regex_diff():
 
         # new diff call finds the service and adds it
 
-        indexed_services = mockif.services_if.transients_if.index_by_component("name")
-        assert_true(svc_name in indexed_services)
-        assert_true(isinstance(indexed_services[svc_name].get("tif"), MockService))  # service type is MockService
+        assert_true(svc_name in mockif.services_if.entities.keys())
+        assert_true(isinstance(mockif.services_if.entities[svc_name].get("tif"), MockService))  # service type is MockService
 
     diffupdate = mockif.services_change_detect()
     assert_true(not diffupdate.added)
@@ -459,8 +439,7 @@ def test_mockinterface_expose_services_regex_diff():
 
     # new diff call finds the service and removes it
 
-    indexed_services = mockif.services_if.transients_if.index_by_component("name")
-    assert_true(svc_name not in indexed_services)  # service not exposed anymore
+    assert_true(svc_name not in mockif.services_if.entities.keys())  # service not exposed anymore
 
 #TODO : test exception raised properly when update transient cannot happen
 
