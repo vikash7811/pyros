@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import logging
 import mock
+import yaml
 from collections import namedtuple
 from contextlib import contextmanager
 
@@ -31,7 +32,7 @@ def pyros_ctx(name='pyros',
             yield ctx(client=client)
     else:
 
-        logging.warning("Setting up pyros {0} node...".format(node_impl))
+        # logging.warning("Setting up pyros {0} node with config : \n{1}".format(node_impl, yaml.dump(pyros_config)))
         subproc = node_impl(name, argv).configure(pyros_config)
 
         client_conn = subproc.start()
